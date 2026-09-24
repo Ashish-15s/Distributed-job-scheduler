@@ -1,6 +1,7 @@
 package com.scheduler.distributed_job_scheduler.controller;
 
 import com.scheduler.distributed_job_scheduler.dto.CreateJobRequest;
+import com.scheduler.distributed_job_scheduler.dto.UpdateJobRequest;
 import com.scheduler.distributed_job_scheduler.entity.Job;
 import com.scheduler.distributed_job_scheduler.service.JobService;
 import jakarta.validation.Valid;
@@ -42,5 +43,18 @@ public class JobController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteJob(@PathVariable Long id) {
         jobService.deleteJob(id);
+    }
+
+    @PutMapping("/{id}")
+    public Job updateJob(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateJobRequest request) {
+
+        return jobService.updateJob(
+                id,
+                request.getName(),
+                request.getCronExpression(),
+                request.getTargetUrl()
+        );
     }
 }
