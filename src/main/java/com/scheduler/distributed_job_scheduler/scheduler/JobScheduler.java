@@ -10,11 +10,13 @@ import com.scheduler.distributed_job_scheduler.repository.JobExecutionRepository
 import com.scheduler.distributed_job_scheduler.repository.JobRepository;
 import com.scheduler.distributed_job_scheduler.service.JobExecutionService;
 import com.scheduler.distributed_job_scheduler.service.JobExecutor;
+import com.scheduler.distributed_job_scheduler.service.RedisLockService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -30,6 +32,7 @@ public class JobScheduler {
     private final JobExecutor jobExecutor;
     private final JobExecutionService jobExecutionService;
     private final JobExecutionProducer jobExecutionProducer;
+    private final RedisLockService redisLockService;
 
     @Scheduled(fixedRate = 1000)
     public void checkForDueJobs() {
@@ -44,28 +47,42 @@ public class JobScheduler {
                 );
 
         for (Job job : dueJobs) {
-            JobExecution execution = JobExecution.builder()
-                    .job(job)
-                    .status(ExecutionStatus.RUNNING)
-                    .startedAt(LocalDateTime.now())
-                    .retryCount(0)
-                    .maxRetries(3)
-                    .build();
-
-            execution = jobExecutionRepository.save(execution);
-
-            jobExecutionProducer.send(
-                    new JobExecutionMessage(job.getId(), execution.getId())
+            String lockKey = "scheduler:job:" + job.getId();
+            String token = redisLockService.acquireLock(
+                    lockKey,
+                    Duration.ofSeconds(30)
             );
 
-            System.out.println("Job dispatched: " + job.getName());
+            if (token == null) {
+                continue;
+            }
 
-            ZonedDateTime nextExecution =
-                    cronService.getNextExecution(job.getCronExpression());
+            try {
+                JobExecution execution = JobExecution.builder()
+                        .job(job)
+                        .status(ExecutionStatus.RUNNING)
+                        .startedAt(LocalDateTime.now())
+                        .retryCount(0)
+                        .maxRetries(3)
+                        .build();
 
-            job.setNextRunAt(nextExecution.toLocalDateTime());
-            jobRepository.save(job);
+                execution = jobExecutionRepository.save(execution);
 
+                jobExecutionProducer.send(
+                        new JobExecutionMessage(job.getId(), execution.getId())
+                );
+
+                System.out.println("Job dispatched: " + job.getName());
+
+                ZonedDateTime nextExecution =
+                        cronService.getNextExecution(job.getCronExpression());
+
+                job.setNextRunAt(nextExecution.toLocalDateTime());
+                jobRepository.save(job);
+            }
+            finally {
+                redisLockService.releaseLock(lockKey, token);
+            }
 
         }
     }

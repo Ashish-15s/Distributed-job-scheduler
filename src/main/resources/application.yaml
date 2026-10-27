@@ -5,11 +5,11 @@ spring:
     url: jdbc:postgresql://localhost:5432/job_scheduler
     username: postgres
     password:
-  redis:
-    image: redis:7-alpine
-    container_name: scheduler-redis
-    ports:
-      - "6379:6379"
+  spring:
+    data:
+      redis:
+        host: localhost
+        port: 6379
 
   jpa:
     hibernate:

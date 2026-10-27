@@ -36,5 +36,7 @@ public class JobExecution {
 
     private Integer maxRetries;
 
+    @Column(nullable = false)
+    private LocalDateTime scheduledFor;
 
 }
