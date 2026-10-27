@@ -1,7 +1,11 @@
 package com.scheduler.distributed_job_scheduler.scheduler;
 
+import com.scheduler.distributed_job_scheduler.entity.ExecutionStatus;
 import com.scheduler.distributed_job_scheduler.entity.Job;
+import com.scheduler.distributed_job_scheduler.entity.JobExecution;
 import com.scheduler.distributed_job_scheduler.entity.JobStatus;
+import com.scheduler.distributed_job_scheduler.kafka.JobExecutionMessage;
+import com.scheduler.distributed_job_scheduler.kafka.JobExecutionProducer;
 import com.scheduler.distributed_job_scheduler.repository.JobExecutionRepository;
 import com.scheduler.distributed_job_scheduler.repository.JobRepository;
 import com.scheduler.distributed_job_scheduler.service.JobExecutionService;
@@ -12,6 +16,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 @Component
@@ -24,6 +29,7 @@ public class JobScheduler {
     private final JobExecutionRepository jobExecutionRepository;
     private final JobExecutor jobExecutor;
     private final JobExecutionService jobExecutionService;
+    private final JobExecutionProducer jobExecutionProducer;
 
     @Scheduled(fixedRate = 1000)
     public void checkForDueJobs() {
@@ -38,8 +44,28 @@ public class JobScheduler {
                 );
 
         for (Job job : dueJobs) {
-            jobExecutionService.execute(job);
-            System.out.println("Job is due: " + job.getName());
+            JobExecution execution = JobExecution.builder()
+                    .job(job)
+                    .status(ExecutionStatus.RUNNING)
+                    .startedAt(LocalDateTime.now())
+                    .retryCount(0)
+                    .maxRetries(3)
+                    .build();
+
+            execution = jobExecutionRepository.save(execution);
+
+            jobExecutionProducer.send(
+                    new JobExecutionMessage(job.getId(), execution.getId())
+            );
+
+            System.out.println("Job dispatched: " + job.getName());
+
+            ZonedDateTime nextExecution =
+                    cronService.getNextExecution(job.getCronExpression());
+
+            job.setNextRunAt(nextExecution.toLocalDateTime());
+            jobRepository.save(job);
+
 
         }
     }
