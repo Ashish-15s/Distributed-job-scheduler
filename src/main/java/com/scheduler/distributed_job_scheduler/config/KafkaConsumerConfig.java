@@ -25,7 +25,10 @@ public class KafkaConsumerConfig {
                 ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,
                 "localhost:9092"
         );
-
+        config.put(
+                "spring.json.value.default.type",
+                "com.scheduler.distributed_job_scheduler.kafka.JobExecutionMessage"
+        );
         config.put(
                 ConsumerConfig.GROUP_ID_CONFIG,
                 "job-worker"

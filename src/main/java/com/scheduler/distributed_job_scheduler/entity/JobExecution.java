@@ -6,7 +6,15 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "job_executions")
+@Table(
+        name = "job_executions",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_job_execution_scheduled_for",
+                        columnNames = {"job_id", "scheduled_for"}
+                )
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -27,6 +35,8 @@ public class JobExecution {
     private ExecutionStatus status;
 
     private LocalDateTime startedAt;
+
+    private LocalDateTime processingStartedAt;
 
     private LocalDateTime completedAt;
 

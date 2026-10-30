@@ -26,6 +26,7 @@ import java.util.List;
 @Transactional
 public class JobScheduler {
 
+
     private final JobRepository jobRepository;
     private final CronService cronService;
     private final JobExecutionRepository jobExecutionRepository;
@@ -58,8 +59,11 @@ public class JobScheduler {
             }
 
             try {
+                LocalDateTime scheduledFor = job.getNextRunAt();
+
                 JobExecution execution = JobExecution.builder()
                         .job(job)
+                        .scheduledFor(scheduledFor)
                         .status(ExecutionStatus.RUNNING)
                         .startedAt(LocalDateTime.now())
                         .retryCount(0)
@@ -85,5 +89,11 @@ public class JobScheduler {
             }
 
         }
+    }
+
+    @Scheduled(fixedRate = 60000)
+    public void recoverStuckJobs() {
+        System.out.println("Recovered execution is running" );
+        jobExecutionService.recoverStuckExecutions();
     }
 }
